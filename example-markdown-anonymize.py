@@ -18,20 +18,40 @@ MODEL_NAME = "qwen-coder-30b"
 
 
 def get_anonymization_mapping(markdown_text: str) -> dict:
-    system_prompt = (
-       "You are an entity anonymization tool. Scan the text to identify all sensitive identifiers "
-        "and map them to standardized, indexed category placeholders.\n\n"
-        "Use sequential schemes such as:\n"
-        "- Organizations / Companies -> 'Company A', 'Company B', 'Firm A'\n"
-        "- Projects / Initiatives -> 'Project A', 'Project B'\n"
-        "- Contracts / Agreements -> 'Contract A', 'Contract B'\n"
-        "- Individuals / Names -> 'Person 1', 'User 1'\n"
-        "- Internal systems, IDs, endpoints -> 'System A', 'ID-001', 'service-alpha'\n\n"
-        "Rules:\n"
-        "1. Maintain 1:1 consistency (the same entity must always receive the same indexed placeholder).\n"
-        "2. Do not invent arbitrary fictional names (like 'HOH' or 'Bambu'); use generic categorizations.\n"
-        "3. Return ONLY a valid JSON object where keys are original terms and values are their assigned placeholders."
-    )
+    SYSTEM_PROMPT = """You are an expert infrastructure, networking, and API data anonymization engine.
+    Scan the input technical documentation and extract ALL private, sensitive, internal, or identifying entities.
+    
+    Map every identified entity to a deterministic, indexed, generic category placeholder following these standards:
+    
+    1. URLs, Endpoints & APIs:
+       - Full API URLs -> 'https://api.domain-a.internal/v1/endpoint-a'
+       - URI Paths / Specific Endpoints -> '/api/v1/endpoint-a', '/endpoint-b', '/webhook-1'
+       - Internal FQDNs / Base Domains -> 'domain-a.internal', 'srv-a.local'
+    
+    2. Networks & Addressing:
+       - Private IPs / CIDRs -> '10.0.X.X', '192.168.X.X', 'Subnet-A'
+       - VLANs -> 'VLAN-1', 'VLAN-2'
+    
+    3. Infrastructure & Compute:
+       - Hostnames / Clusters -> 'Host-A', 'Cluster-1', 'Node-A'
+       - Buckets / Repositories -> 'bucket-a', 'repo-alpha'
+       - Databases / Schemas -> 'db-instance-1', 'schema_a'
+    
+    4. Organization & Projects:
+       - Companies / Clients / Vendors -> 'Company A', 'Client 1', 'Vendor A'
+       - Project / Initiative names -> 'Project A', 'Project B'
+       - Contracts / Agreements -> 'Contract A', 'SLA-1'
+    
+    5. Identities & Secrets:
+       - Real person names -> 'Person 1', 'Person 2'
+       - Account / Tenant IDs -> 'ID-001', 'Tenant-A'
+       - Secrets / API Keys / Tokens -> '[REDACTED_SECRET_1]', '[AUTH_TOKEN_A]'
+    
+    CRITICAL RULES:
+    1. Return ONLY a valid JSON object: {"<original_term>": "<assigned_placeholder>"}.
+    2. Maintain strict 1:1 consistency (the exact same endpoint or URL must always map to the exact same placeholder).
+    3. Capture both full URLs and isolated endpoint paths (e.g., capture both 'https://api.company.com/v1/auth' and standalone '/v1/auth').
+    4. Do NOT use arbitrary proper nouns; use indexed category names ('Endpoint-A', 'domain-a.internal')."""
 
     headers = {
         "Authorization": f"Bearer {API_KEY}",
