@@ -19,13 +19,18 @@ MODEL_NAME = "qwen-coder-30b"
 
 def get_anonymization_mapping(markdown_text: str) -> dict:
     system_prompt = (
-        "You are an entity anonymization engine. Read the markdown text and identify all sensitive entities:\n"
-        "- Organization / Company names\n"
-        "- Person names\n"
-        "- Specific internal IDs, keys, service tags\n"
-        "- Project names (e.g., 'Project Bambu' -> 'Project HOH')\n\n"
-        "Return ONLY a valid JSON object where keys are original terms and values are realistic replacements. "
-        "Do not include explanation or markdown formatting."
+       "You are an entity anonymization tool. Scan the text to identify all sensitive identifiers "
+        "and map them to standardized, indexed category placeholders.\n\n"
+        "Use sequential schemes such as:\n"
+        "- Organizations / Companies -> 'Company A', 'Company B', 'Firm A'\n"
+        "- Projects / Initiatives -> 'Project A', 'Project B'\n"
+        "- Contracts / Agreements -> 'Contract A', 'Contract B'\n"
+        "- Individuals / Names -> 'Person 1', 'User 1'\n"
+        "- Internal systems, IDs, endpoints -> 'System A', 'ID-001', 'service-alpha'\n\n"
+        "Rules:\n"
+        "1. Maintain 1:1 consistency (the same entity must always receive the same indexed placeholder).\n"
+        "2. Do not invent arbitrary fictional names (like 'HOH' or 'Bambu'); use generic categorizations.\n"
+        "3. Return ONLY a valid JSON object where keys are original terms and values are their assigned placeholders."
     )
 
     headers = {
