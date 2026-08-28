@@ -2,6 +2,8 @@ import base64
 import mimetypes
 from pathlib import Path
 from openai import OpenAI
+import io
+from PIL import Image
 
 def encode_image_to_data_uri(image_path: str | Path) -> str:
     """Reads a local image file and converts it to a base64 Data URI."""
@@ -18,6 +20,25 @@ def encode_image_to_data_uri(image_path: str | Path) -> str:
         base64_encoded = base64.b64encode(f.read()).decode("utf-8")
 
     return f"data:{mime_type};base64,{base64_encoded}"
+
+
+def encode_png_safely(image_path: str) -> str:
+    with Image.open(image_path) as img:
+        # If PNG has alpha channel or palette, composite onto a white background
+        if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+            img = img.convert("RGBA")
+            background = Image.new("RGBA", img.size, (255, 255, 255, 255))
+            alpha_composite = Image.alpha_composite(background, img)
+            rgb_img = alpha_composite.convert("RGB")
+        else:
+            rgb_img = img.convert("RGB")
+
+        # Save as clean JPEG or clean PNG into a buffer
+        buffered = io.BytesIO()
+        rgb_img.save(buffered, format="JPEG", quality=95)
+        encoded_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        
+        return f"data:image/jpeg;base64,{encoded_string}"
 
 
 def test_vllm_vision(
