@@ -1,0 +1,16 @@
+python3 - <<'EOF'
+  import json, urllib.request
+  BASE, MODEL = "http://localhost:11434", "gemma4:26b"
+  op = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+  marker = "KENNWORT-7391"
+  filler = "\n".join(f"Zeile {i}: Beispieltext ohne Bedeutung." for i in range(1500))   # ~10k tokens
+  body = {"model": MODEL, "temperature": 0, "max_tokens": 20,
+          "messages": [{"role": "user", "content": f"Das Kennwort lautet {marker}.\n{filler}\nWie lautet das Kennwort? Antworte 
+  nur mit dem Kennwort."}]}
+  req = urllib.request.Request(f"{BASE}/v1/chat/completions", data=json.dumps(body).encode(), headers={"Content-Type":
+  "application/json"})
+  r = json.load(op.open(req, timeout=900))
+  print("prompt_tokens:", r["usage"]["prompt_tokens"], "| answer:", r["choices"][0]["message"]["content"].strip())
+  for m in json.load(op.open(f"{BASE}/api/ps", timeout=30)).get("models", []):
+      print(m["name"], "served context_length:", m.get("context_length"))
+  EOF
