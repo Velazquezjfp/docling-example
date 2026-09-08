@@ -1,0 +1,45 @@
+python3 - <<'EOF'
+  import json, time, urllib.request
+  BASE, MODEL = "http://localhost:11434", "gemma4:26b"
+  op = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+  def post(path, body, timeout=900):
+      req = urllib.request.Request(f"{BASE}{path}", data=json.dumps(body).encode(), headers={"Content-Type":
+  "application/json"})
+      return json.load(op.open(req, timeout=timeout))
+  def get(path, timeout=30):
+      return json.load(op.open(f"{BASE}{path}", timeout=timeout))
+
+  # 1. model file: does the tag think, what is the model maximum
+  show = post("/api/show", {"name": MODEL}, 60)
+  print("capabilities :", show.get("capabilities"))            # 'thinking' listed = think flag honoured
+  print("parameters   :", (show.get("parameters") or "").replace("\n", " | ")[:300])
+  print("model max ctx:", {k: v for k, v in show.get("model_info", {}).items() if k.endswith("context_length")})
+
+  # 2. OpenAI-compatible call, exactly how the retrieval client talks today (thinking on by default)
+  marker = "KENNWORT-7391"
+  filler = "\n".join(f"Zeile {i}: Beispieltext ohne Bedeutung." for i in range(1500))   # ~10k tokens
+  q = f"Das Kennwort lautet {marker}.\n{filler}\nWie lautet das Kennwort? Antworte nur mit dem Kennwort."
+  t = time.time()
+  r = post("/v1/chat/completions", {"model": MODEL, "temperature": 0, "max_tokens": 400,
+                                    "messages": [{"role": "user", "content": q}]})
+  m = r["choices"][0]["message"]
+  print("\n[openai] finish:", r["choices"][0]["finish_reason"], "| prompt_tokens:", r["usage"]["prompt_tokens"],
+        "| completion_tokens:", r["usage"]["completion_tokens"], "| %.0fs" % (time.time() - t))
+  print("[openai] content  :", repr((m.get("content") or "")[:120]))
+  print("[openai] reasoning:", len(m.get("reasoning") or m.get("reasoning_content") or ""), "chars")
+
+  # 3. served context while the model is loaded
+  for p in get("/api/ps").get("models", []):
+      print("[ps] served context_length:", p.get("context_length"), "for", p["name"])
+
+  # 4. native call, thinking OFF, explicit context window per request
+  t = time.time()
+  n = post("/api/chat", {"model": MODEL, "think": False, "stream": False,
+                         "options": {"num_ctx": 16384, "num_predict": 400, "temperature": 0},
+                         "messages": [{"role": "user", "content": q}]})
+  print("\n[native think=false] done_reason:", n.get("done_reason"), "| prompt_eval:", n.get("prompt_eval_count"),
+        "| eval:", n.get("eval_count"), "| %.0fs" % (time.time() - t),
+        "| tok/s: %.1f" % (n.get("eval_count", 0) / max(n.get("eval_duration", 1) / 1e9, 1e-9)))
+  print("[native] content :", repr((n["message"].get("content") or "")[:120]))
+  print("[native] thinking:", len(n["message"].get("thinking") or ""), "chars")
+  EOF
