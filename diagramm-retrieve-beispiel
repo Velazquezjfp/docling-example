@@ -1,0 +1,48 @@
+flowchart TB
+  Q[/"❓ Wer ist verantwortlich für SOP-ZSD-06?<br/>+ doc_ids filter from rag_users"/]
+
+  subgraph RR["rag_retrieval (library inside the chat process)"]
+    direction TB
+    S1["① ANALYZE · no I/O, no model<br/>6 ontology regexes · label n-grams 4→1<br/>partial labels · cue table"]
+    S2["② EMBED · 1 call<br/>prefix 'query: ' · e5-large"]
+    S3["③ FOUR CHANNELS · 1 msearch<br/>knn · bm25 · identifier · label<br/>k = 20 each · all return CHUNKS"]
+    S4["④ RRF FUSION<br/>score = Σ 1/(60 + rank)"]
+    S5{"⑤ GUARDRAIL<br/>identifier or label matched?"}
+    S6["⑥ GRAPH CHANNEL (slow mode)<br/>start nodes → 1 hop → facts ≤ 40,<br/>entity cards ≤ 15, chunks ≤ 15 via mget<br/>→ 5th list → RRF again · pin 2 best facts"]
+    S7["⑦ GROUP + CITE<br/>table parts with same caption = 1 source"]
+    S8["⑧ RENDER CONTEXT<br/>Entitäten → Fakten → Quellen<br/>budget 6 000 tokens"]
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 -->|"strong"| S6
+    S6 --> S7
+    S7 --> S8
+  end
+
+  STOP(["'Dazu steht nichts in den Handbüchern.'<br/>no LLM call"])
+  S5 -->|"weak, first turn,<br/>strict profile"| STOP
+  OUT[/"📨 context block → prompt → LLM"/]
+  S8 --> OUT
+
+  B1("💬 <b>analysis</b><br/>identifiers: ['SOP-ZSD-06']<br/>label_nodes: [Procedure_05f570dc41890cfe]<br/>cue: RESPONSIBLE_FOR, ESCALATES_TO first")
+  B2("💬 <b>query vector</b><br/>[0.012, -0.044, 0.031, … ×1024]")
+  B3("💬 <b>channel hits</b> (ranks illustrative)<br/>identifier#1 2bb722f565a0-0055 (Tabelle 7, S. 17)<br/>label#1      2bb722f565a0-0055<br/>bm25#1       2bb722f565a0-0055<br/>knn#3        2bb722f565a0-0055<br/>label#2      2bb722f565a0-0062 (6.3 Kaltstart, S. 19)")
+  B4("💬 <b>fused</b><br/>1. …-0055  0.0650  4 channels agree<br/>2. …-0062  0.0310<br/>3. …       …")
+  B5("💬 <b>graph output</b><br/>fact: Kai Ostermann —RESPONSIBLE_FOR→ SOP-ZSD-06<br/>   (raci=verantwortlich) [S. 17; Kante 2aca7dfa9b3a135b]<br/>fact: Kai Ostermann —ESCALATES_TO→ Dr. Annika Reuß<br/>card: Kai Ostermann (Person) — Durchwahl 1315 …<br/>via: 'RESPONSIBLE_FOR from Kai Ostermann'")
+  B6("💬 <b>source group</b><br/>### Quelle 1 · BHB-PLT-0007 · S. 17<br/>5 Betrieb › 5.5 SOPs · Tabelle 7<br/>[2bb722f565a0-0055]")
+
+  Q --> S1
+  S1 -.- B1
+  S2 -.- B2
+  S3 -.- B3
+  S4 -.- B4
+  S6 -.- B5
+  S7 -.- B6
+
+  classDef bubble fill:#fffde7,stroke:#b9a100,stroke-dasharray:3 3,font-family:monospace,font-size:11px,text-align:left
+  classDef box fill:#eef4ff,stroke:#3b6fd8,stroke-width:2px
+  classDef stop fill:#fdecea,stroke:#c62828
+  class B1,B2,B3,B4,B5,B6 bubble
+  class RR box
+  class STOP stop
